@@ -70,3 +70,44 @@ pub fn writeFile(file_path: []const u8, bytes: []const u8) !void {
 
     _ = try file.write(bytes);
 }
+
+/// Read directory
+/// 
+/// Example:
+/// * *
+/// const std = @import("std");
+/// const utils = @import("utils.zig");
+/// 
+/// pub fn main() !void {
+///   var allocator = std.heap.page_allocator;
+///   const dir = try utils.readDir(&allocator,".");
+///   defer allocator.free(dir);
+/// 
+///   for (dir) |entry| {
+///     switch (entry.kind) {
+///       .Directory => std.debug.print("Name: {s}, Kind: Directory\n", .{entry.name}),
+///       .File => std.debug.print("Name: {s}, Kind: File\n", .{entry.name}),
+///       else => std.debug.print("Name: {s}\n", .{entry.name})
+///     }
+///   }
+/// }
+/// * *
+/// 
+/// @param allocator
+/// @param dir_path
+/// @param Slice of std.fs.Dir.Entry
+pub fn readDir(allocator: *std.mem.Allocator, dir_path: []const u8) ![]std.fs.Dir.Entry {
+    var dir = try std.fs.cwd().openDir(dir_path, .{ .iterate = true });
+    defer dir.close();
+
+    var entries = try allocator.alloc(std.fs.Dir.Entry, 0);
+
+    var iter = dir.iterate();
+    var i: usize = 0;
+    while (try iter.next()) |entry| : (i += 1) {
+        entries = try allocator.realloc(entries, (i + 1));
+        entries[i] = entry;
+    }
+
+    return entries;
+}
