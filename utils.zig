@@ -28,7 +28,7 @@ const std = @import("std");
 /// 
 /// pub fn main() !void {
 ///   var allocator = std.heap.page_allocator;
-///   const text = try utils.readFile(&allocator, "file.txt");
+///   const text = try utils.readFile(allocator, "file.txt");
 ///   defer allocator.free(text);
 ///   std.debug.print("{s}\n", .{text});
 /// }
@@ -37,13 +37,14 @@ const std = @import("std");
 /// @param allocator
 /// @param file_path
 /// @return file content
-pub fn readFile(allocator: *std.mem.Allocator, file_path: []const u8) ![]u8 {
+pub fn readFile(allocator: std.mem.Allocator, file_path: []const u8) ![]u8 {
     const file = try std.fs.cwd().openFile(file_path, .{});
     defer file.close();
 
     const file_size = (try file.stat()).size;
 
     var buf = try allocator.alloc(u8, file_size);
+    errdefer allocator.free(buf);
 
     _ = try file.read(buf);
 
@@ -80,7 +81,7 @@ pub fn writeFile(file_path: []const u8, bytes: []const u8) !void {
 /// 
 /// pub fn main() !void {
 ///   var allocator = std.heap.page_allocator;
-///   const dir = try utils.readDir(&allocator,".");
+///   const dir = try utils.readDir(allocator,".");
 ///   defer allocator.free(dir);
 /// 
 ///   for (dir) |entry| {
@@ -96,11 +97,12 @@ pub fn writeFile(file_path: []const u8, bytes: []const u8) !void {
 /// @param allocator
 /// @param dir_path
 /// @param Slice of std.fs.Dir.Entry
-pub fn readDir(allocator: *std.mem.Allocator, dir_path: []const u8) ![]std.fs.Dir.Entry {
+pub fn readDir(allocator: std.mem.Allocator, dir_path: []const u8) ![]std.fs.Dir.Entry {
     var dir = try std.fs.cwd().openDir(dir_path, .{ .iterate = true });
     defer dir.close();
 
     var entries = try allocator.alloc(std.fs.Dir.Entry, 0);
+    errdefer allocator.free(entries);
 
     var iter = dir.iterate();
     var i: usize = 0;
@@ -110,4 +112,35 @@ pub fn readDir(allocator: *std.mem.Allocator, dir_path: []const u8) ![]std.fs.Di
     }
 
     return entries;
+}
+
+/// Read string from stdin
+/// 
+/// Example:
+/// * *
+/// const std = @import("std");
+/// const utils = @import("utils.zig");
+/// 
+/// pub fn main() !void {
+///   var allocator = std.heap.page_allocator;
+///   const str = try utils.readString(allocator,'\n');
+///   defer allocator.free(str);
+///   std.debug.print("{s}\n", .{str});
+/// }
+/// * *
+/// 
+/// @param allocator
+/// @param delimiter
+/// @param Slice of bytes
+pub fn readString(allocator: std.mem.Allocator, delimiter: u8) ![]u8 {
+    const stdin = std.io.getStdIn().reader();
+    var buffer = try allocator.alloc(u8, 0);
+    errdefer allocator.free(buffer);
+    var i: usize = 0;
+    var byte = try stdin.readByte();
+    while (byte != delimiter ) : ({ byte = try stdin.readByte(); i += 1; }) {
+        buffer = try allocator.realloc(buffer, (i + 1));
+        buffer[i] = byte;
+    }
+    return buffer;
 }
